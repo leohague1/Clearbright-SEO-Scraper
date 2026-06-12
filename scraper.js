@@ -26,6 +26,7 @@ function classifyWebsite(url) {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CHECKPOINT_PATH  = path.join(__dirname, "checkpoint.json");
+const SEEN_PATH        = path.join(__dirname, "seen_listings.json");
 const OUTPUT_DIR       = path.join(__dirname, "output");
 const MASTER_CSV_PATH  = path.join(OUTPUT_DIR, "leads_master.csv");
 const MASTER_XLSX_PATH = path.join(OUTPUT_DIR, "leads_master.xlsx");
@@ -244,6 +245,17 @@ function deleteCheckpoint() {
   if (fs.existsSync(CHECKPOINT_PATH)) fs.unlinkSync(CHECKPOINT_PATH);
 }
 
+function loadSeenListings() {
+  if (fs.existsSync(SEEN_PATH)) {
+    return new Set(JSON.parse(fs.readFileSync(SEEN_PATH, "utf-8")));
+  }
+  return new Set();
+}
+
+function saveSeenListings(seen) {
+  fs.writeFileSync(SEEN_PATH, JSON.stringify([...seen]));
+}
+
 function buildOutputPath() {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -413,7 +425,7 @@ async function extractListingDetails(page) {
   });
 }
 
-async function scrapeSearch(page, category, town) {
+async function scrapeSearch(page, category, town, seenListings) {
   const results = [];
   const skipCounts = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0 };
   const mapsUrl = buildMapsUrl(category, town);
@@ -433,8 +445,10 @@ async function scrapeSearch(page, category, town) {
     return { results, skipCounts };
   }
 
-  const listingUrls = await getListingUrls(page, MAX_RESULTS_PER_SEARCH);
-  console.log(chalk.green(`  Found ${listingUrls.length} listings to process`));
+  const allUrls = await getListingUrls(page, MAX_RESULTS_PER_SEARCH);
+  const listingUrls = allUrls.filter((u) => !seenListings.has(u));
+  const skippedSeen = allUrls.length - listingUrls.length;
+  console.log(chalk.green(`  Found ${allUrls.length} listings — ${listingUrls.length} new, ${skippedSeen} already seen`))
 
   for (const placeUrl of listingUrls) {
     try {
@@ -449,6 +463,7 @@ async function scrapeSearch(page, category, town) {
 
       if (!details.businessName) {
         console.log(chalk.yellow(`  [SKIP] Could not extract name`));
+        seenListings.add(placeUrl);
         continue;
       }
 
@@ -457,12 +472,14 @@ async function scrapeSearch(page, category, town) {
       if (websiteStatus === "Good") {
         console.log(chalk.yellow(`  [SKIP] ${details.businessName}: has website`));
         skipCounts.hasWebsite++;
+        seenListings.add(placeUrl);
         continue;
       }
 
       if (!details.phone) {
         console.log(chalk.yellow(`  [SKIP] ${details.businessName}: no phone`));
         skipCounts.noPhone++;
+        seenListings.add(placeUrl);
         continue;
       }
 
@@ -470,6 +487,7 @@ async function scrapeSearch(page, category, town) {
       if (!mobilePhone) {
         console.log(chalk.yellow(`  [SKIP] ${details.businessName}: not a UK mobile (${details.phone})`));
         skipCounts.notMobile++;
+        seenListings.add(placeUrl);
         continue;
       }
 
@@ -477,9 +495,9 @@ async function scrapeSearch(page, category, town) {
       if (isExcludedType(details.businessName, resolvedCategory)) {
         console.log(chalk.yellow(`  [SKIP] ${details.businessName}: excluded business type`));
         skipCounts.excludedType++;
+        seenListings.add(placeUrl);
         continue;
       }
-
 
       const lead = {
         businessName: details.businessName,
@@ -495,9 +513,11 @@ async function scrapeSearch(page, category, town) {
       };
 
       results.push(lead);
+      seenListings.add(placeUrl);
       console.log(chalk.green(`  [LEAD] ${details.businessName} [${websiteStatus}]`));
 
     } catch (err) {
+      // Don't add to seen on error — allow retry on next run
       console.log(chalk.yellow(`  [ERROR] ${err.message?.slice(0, 120)}`));
     }
 
@@ -514,6 +534,10 @@ async function main() {
   // Load existing phone numbers upfront — used to skip duplicates after scraping
   const existingPhones = await loadExistingPhones();
   console.log(chalk.cyan(`[MASTER] ${existingPhones.size} leads already in leads_master.xlsx`));
+
+  // Load seen listing URLs — these are skipped entirely on future runs
+  const seenListings = loadSeenListings();
+  console.log(chalk.cyan(`[SEEN]   ${seenListings.size} listings already processed (will be skipped)`));
 
   const checkpoint = loadCheckpoint();
   if (checkpoint.completed.length > 0) {
@@ -541,7 +565,7 @@ async function main() {
         }
 
         try {
-          const { results, skipCounts } = await scrapeSearch(page, category, town);
+          const { results, skipCounts } = await scrapeSearch(page, category, town, seenListings);
 
           allResults.push(...results);
           totalSkips.hasWebsite   += skipCounts.hasWebsite;
@@ -552,6 +576,7 @@ async function main() {
           checkpoint.completed.push(key);
           checkpoint.results_so_far = allResults.length;
           saveCheckpoint(checkpoint);
+          saveSeenListings(seenListings);
 
           console.log(chalk.green(`  [DONE] ${key} — ${results.length} leads found`));
         } catch (err) {
