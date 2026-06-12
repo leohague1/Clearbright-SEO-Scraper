@@ -36,6 +36,14 @@ export const SEARCHES = [
   { category: "cafe",              towns: ESSEX_TOWNS },
   { category: "cleaning service",  towns: ESSEX_TOWNS },
   { category: "painter decorator", towns: ESSEX_TOWNS },
+  { category: "gardener",          towns: ESSEX_TOWNS },
+  { category: "handyman",          towns: ESSEX_TOWNS },
+  { category: "plasterer",         towns: ESSEX_TOWNS },
+  { category: "tiler",             towns: ESSEX_TOWNS },
+  { category: "roofer",            towns: ESSEX_TOWNS },
+  { category: "carpenter",         towns: ESSEX_TOWNS },
+  { category: "locksmith",         towns: ESSEX_TOWNS },
+  { category: "mobile mechanic",   towns: ESSEX_TOWNS },
 ];
 
 export const MAX_RESULTS_PER_SEARCH = 20;
