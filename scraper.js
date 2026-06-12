@@ -7,7 +7,6 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { SEARCHES, MAX_RESULTS_PER_SEARCH, DELAYS, EXCLUDED_BUSINESS_TYPES } from "./config.js";
-import { findEmail } from "./emailFinder.js";
 
 chromium.use(StealthPlugin());
 
@@ -493,16 +492,12 @@ async function scrapeSearch(page, category, town) {
         continue;
       }
 
-      // Email search is best-effort — lead is saved regardless
-      const email = await findEmail(page, details.businessName, town);
-      await randomDelay(DELAYS.betweenEmailSearches);
-
       const lead = {
         businessName: details.businessName,
         category: resolvedCategory,
         town,
         phone: mobilePhone,
-        email: email || "",
+        email: "",
         address: details.address || "",
         websiteStatus,
         rating: details.rating || "",
@@ -511,8 +506,7 @@ async function scrapeSearch(page, category, town) {
       };
 
       results.push(lead);
-      const emailNote = email ? `— ${email}` : "— no email";
-      console.log(chalk.green(`  [LEAD] ${details.businessName} [${websiteStatus}] ${emailNote}`));
+      console.log(chalk.green(`  [LEAD] ${details.businessName} [${websiteStatus}]`));
 
     } catch (err) {
       console.log(chalk.yellow(`  [ERROR] ${err.message?.slice(0, 120)}`));

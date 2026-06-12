@@ -41,8 +41,7 @@ export const SEARCHES = [
 export const MAX_RESULTS_PER_SEARCH = 20;
 
 export const DELAYS = {
-  betweenActions:      [800,  2000],
-  betweenListings:     [1500, 3500],
-  betweenSearches:     [4000, 8000],
-  betweenEmailSearches:[2000, 4000],
+  betweenActions:  [800,  2000],
+  betweenListings: [1500, 3500],
+  betweenSearches: [4000, 8000],
 };
