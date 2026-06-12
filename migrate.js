@@ -5,6 +5,15 @@ import { fileURLToPath } from "url";
 import chalk from "chalk";
 import { initSheet, loadExistingPhones, appendLeads } from "./sheets.js";
 
+function normalizePhone(phone) {
+  if (!phone) return null;
+  const digits = phone.toString().trim().replace(/\D/g, "");
+  if (digits.startsWith("447") && digits.length === 12) return "0" + digits.slice(2);
+  if (digits.startsWith("07")  && digits.length === 11) return digits;
+  if (digits.startsWith("7")   && digits.length === 10) return "0" + digits; // Excel stripped leading 0
+  return null;
+}
+
 const __dirname        = path.dirname(fileURLToPath(import.meta.url));
 const MASTER_XLSX_PATH = path.join(__dirname, "output", "leads_master.xlsx");
 
@@ -46,7 +55,10 @@ async function loadExcel() {
       const val = cell.value?.hyperlink ? cell.value.hyperlink : (cell.value?.toString() ?? "");
       obj[headers[col]] = val;
     });
-    if (obj.businessName) results.push(obj);
+    if (obj.businessName) {
+      obj.phone = normalizePhone(obj.phone) || obj.phone;
+      results.push(obj);
+    }
   });
   return results;
 }

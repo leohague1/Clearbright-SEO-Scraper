@@ -164,7 +164,14 @@ export async function loadExistingPhones() {
   const phones = new Set();
   (res.data.values || []).forEach((row, i) => {
     if (i === 0) return;
-    if (row[0]?.trim()) phones.add(row[0].trim());
+    const raw = row[0]?.toString().trim();
+    if (!raw) return;
+    const digits = raw.replace(/\D/g, "");
+    // Normalize to 07XXXXXXXXX so dedup works regardless of how the number was stored
+    if (digits.startsWith("447") && digits.length === 12) phones.add("0" + digits.slice(2));
+    else if (digits.startsWith("07") && digits.length === 11) phones.add(digits);
+    else if (digits.startsWith("7")  && digits.length === 10) phones.add("0" + digits);
+    else phones.add(raw);
   });
   return phones;
 }
