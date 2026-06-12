@@ -46,11 +46,11 @@ export async function formatSheet() {
     cleanupRequests.push({ deleteConditionalFormatRule: { sheetId: SHEET_ID, index: i } });
   }
 
-  // Reset ALL cell formatting across the whole sheet to default
+  // Reset ALL cell formatting across the whole sheet to default (empty = no colour, default text)
   cleanupRequests.push({
-    updateCells: {
+    repeatCell: {
       range: { sheetId: SHEET_ID },
-      rows:  [],
+      cell:  { userEnteredFormat: {} },
       fields: "userEnteredFormat",
     },
   });
