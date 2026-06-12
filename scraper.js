@@ -245,7 +245,7 @@ async function scrapeSearch(page, category, town, seenListings) {
 
       if (!details.businessName) {
         console.log(chalk.yellow(`  [SKIP] Could not extract name`));
-        seenListings.add(placeUrl);
+        seenListings.add(placeUrl); saveSeenListings(seenListings);
         continue;
       }
 
@@ -253,14 +253,14 @@ async function scrapeSearch(page, category, town, seenListings) {
       if (websiteStatus === "Good") {
         console.log(chalk.yellow(`  [SKIP] ${details.businessName}: has website`));
         skipCounts.hasWebsite++;
-        seenListings.add(placeUrl);
+        seenListings.add(placeUrl); saveSeenListings(seenListings);
         continue;
       }
 
       if (!details.phone) {
         console.log(chalk.yellow(`  [SKIP] ${details.businessName}: no phone`));
         skipCounts.noPhone++;
-        seenListings.add(placeUrl);
+        seenListings.add(placeUrl); saveSeenListings(seenListings);
         continue;
       }
 
@@ -268,7 +268,7 @@ async function scrapeSearch(page, category, town, seenListings) {
       if (!mobilePhone) {
         console.log(chalk.yellow(`  [SKIP] ${details.businessName}: not a UK mobile (${details.phone})`));
         skipCounts.notMobile++;
-        seenListings.add(placeUrl);
+        seenListings.add(placeUrl); saveSeenListings(seenListings);
         continue;
       }
 
@@ -276,7 +276,7 @@ async function scrapeSearch(page, category, town, seenListings) {
       if (isExcludedType(details.businessName, resolvedCategory)) {
         console.log(chalk.yellow(`  [SKIP] ${details.businessName}: excluded business type`));
         skipCounts.excludedType++;
-        seenListings.add(placeUrl);
+        seenListings.add(placeUrl); saveSeenListings(seenListings);
         continue;
       }
 
@@ -291,7 +291,7 @@ async function scrapeSearch(page, category, town, seenListings) {
         rating:  details.rating || "",
         gbpUrl:  mapsPageUrl,
       });
-      seenListings.add(placeUrl);
+      seenListings.add(placeUrl); saveSeenListings(seenListings);
       console.log(chalk.green(`  [LEAD] ${details.businessName} [${websiteStatus}]`));
 
     } catch (err) {
