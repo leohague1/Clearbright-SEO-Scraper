@@ -224,12 +224,6 @@ function isExcludedType(businessName, category) {
   return EXCLUDED_BUSINESS_TYPES.some((term) => haystack.includes(term.toLowerCase()));
 }
 
-// Returns true when a business has 50 or more Google reviews.
-function tooManyReviews(reviews) {
-  if (!reviews) return false;
-  const n = parseInt(reviews, 10);
-  return !isNaN(n) && n >= 50;
-}
 
 function randomDelay([min, max]) {
   return new Promise((r) => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
@@ -421,7 +415,7 @@ async function extractListingDetails(page) {
 
 async function scrapeSearch(page, category, town) {
   const results = [];
-  const skipCounts = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0, tooManyReviews: 0 };
+  const skipCounts = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0 };
   const mapsUrl = buildMapsUrl(category, town);
 
   console.log(chalk.green(`\n[START] ${category} in ${town}`));
@@ -486,11 +480,6 @@ async function scrapeSearch(page, category, town) {
         continue;
       }
 
-      if (tooManyReviews(details.reviews)) {
-        console.log(chalk.yellow(`  [SKIP] ${details.businessName}: ${details.reviews} reviews (≥50)`));
-        skipCounts.tooManyReviews++;
-        continue;
-      }
 
       const lead = {
         businessName: details.businessName,
@@ -532,7 +521,7 @@ async function main() {
   }
 
   const allResults = [];
-  const totalSkips = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0, tooManyReviews: 0 };
+  const totalSkips = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0 };
 
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
@@ -555,11 +544,10 @@ async function main() {
           const { results, skipCounts } = await scrapeSearch(page, category, town);
 
           allResults.push(...results);
-          totalSkips.hasWebsite     += skipCounts.hasWebsite;
-          totalSkips.noPhone        += skipCounts.noPhone;
-          totalSkips.notMobile      += skipCounts.notMobile;
-          totalSkips.excludedType   += skipCounts.excludedType;
-          totalSkips.tooManyReviews += skipCounts.tooManyReviews;
+          totalSkips.hasWebsite   += skipCounts.hasWebsite;
+          totalSkips.noPhone      += skipCounts.noPhone;
+          totalSkips.notMobile    += skipCounts.notMobile;
+          totalSkips.excludedType += skipCounts.excludedType;
 
           checkpoint.completed.push(key);
           checkpoint.results_so_far = allResults.length;
@@ -608,11 +596,10 @@ async function main() {
   console.log(chalk.green(`New leads appended to master:   ${trulyNew.length}`));
   console.log(chalk.green(`Total leads in master file:     ${masterTotal}`));
   console.log(chalk.yellow(`Total listings skipped:         ${totalSkipped}`));
-  console.log(chalk.yellow(`  Has website:                  ${totalSkips.hasWebsite}`));
-  console.log(chalk.yellow(`  No phone:                     ${totalSkips.noPhone}`));
-  console.log(chalk.yellow(`  Not UK mobile:                ${totalSkips.notMobile}`));
-  console.log(chalk.yellow(`  Excluded business type:       ${totalSkips.excludedType}`));
-  console.log(chalk.yellow(`  Too many reviews (≥50):       ${totalSkips.tooManyReviews}`));
+  console.log(chalk.yellow(`  Has website:            ${totalSkips.hasWebsite}`));
+  console.log(chalk.yellow(`  No phone:               ${totalSkips.noPhone}`));
+  console.log(chalk.yellow(`  Not UK mobile:          ${totalSkips.notMobile}`));
+  console.log(chalk.yellow(`  Excluded business type: ${totalSkips.excludedType}`));
   console.log(chalk.green(`Master file:                    ${MASTER_XLSX_PATH}`));
   console.log("=".repeat(50));
 
