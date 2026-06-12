@@ -6,7 +6,7 @@ import chalk from "chalk";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { SEARCHES, MAX_RESULTS_PER_SEARCH, DELAYS } from "./config.js";
+import { SEARCHES, MAX_RESULTS_PER_SEARCH, DELAYS, EXCLUDED_BUSINESS_TYPES } from "./config.js";
 import { findEmail } from "./emailFinder.js";
 
 chromium.use(StealthPlugin());
@@ -31,7 +31,7 @@ const OUTPUT_DIR       = path.join(__dirname, "output");
 const MASTER_CSV_PATH  = path.join(OUTPUT_DIR, "leads_master.csv");
 const MASTER_XLSX_PATH = path.join(OUTPUT_DIR, "leads_master.xlsx");
 
-// Maps CSV column titles back to internal field names for reading the master file
+// Maps column header titles back to internal field names
 const CSV_HEADER_MAP = {
   "Business Name":  "businessName",
   "Category":       "category",
@@ -43,6 +43,7 @@ const CSV_HEADER_MAP = {
   "Rating":         "rating",
   "Reviews":        "reviews",
   "GBP URL":        "gbpUrl",
+  "Maps Link":      "gbpUrl",  // xlsx column header (CSV uses "GBP URL")
 };
 
 const CSV_HEADERS = [
@@ -104,99 +105,131 @@ async function writeCsv(filePath, records) {
   await writer.writeRecords(records);
 }
 
-async function loadMasterXlsx() {
-  if (!fs.existsSync(MASTER_XLSX_PATH)) return null; // null = file doesn't exist yet
+// Returns a Set of phone number strings already present in the master xlsx.
+async function loadExistingPhones() {
+  if (!fs.existsSync(MASTER_XLSX_PATH)) return new Set();
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(MASTER_XLSX_PATH);
   const sheet = wb.getWorksheet("Leads");
-  if (!sheet) return [];
+  if (!sheet) return new Set();
 
-  const headers = [];
-  const results = [];
+  let phoneCol = null;
+  sheet.getRow(1).eachCell((cell, col) => {
+    if (cell.value?.toString().trim() === "Phone") phoneCol = col;
+  });
+  if (phoneCol === null) return new Set();
 
+  const phones = new Set();
   sheet.eachRow((row, rowNum) => {
-    if (rowNum === 1) {
-      row.eachCell((cell, col) => {
-        headers[col] = CSV_HEADER_MAP[cell.value?.toString().trim()] || cell.value;
-      });
-      return;
-    }
-    const obj = {};
-    row.eachCell((cell, col) => {
-      // Hyperlink cells store value as an object
-      const val = cell.value?.hyperlink ? "" : (cell.value?.toString() ?? "");
-      obj[headers[col]] = val;
-    });
-    // Only push rows that have at least a business name
-    if (obj.businessName) results.push(obj);
+    if (rowNum === 1) return;
+    const val = row.getCell(phoneCol).value?.toString().trim();
+    if (val) phones.add(val);
   });
 
-  return results;
+  return phones;
 }
 
-async function writeMasterXlsx(records) {
+// Column layout — single source of truth for both fresh creation and key re-establishment.
+const SHEET_COLUMNS = [
+  { header: "Business Name",  key: "businessName",  width: 35 },
+  { header: "Category",       key: "category",      width: 22 },
+  { header: "Town",           key: "town",          width: 18 },
+  { header: "Phone",          key: "phone",         width: 18 },
+  { header: "Email",          key: "email",         width: 32 },
+  { header: "Address",        key: "address",       width: 42 },
+  { header: "Website Status", key: "websiteStatus", width: 30 },
+  { header: "Rating",         key: "rating",        width: 10 },
+  { header: "Reviews",        key: "reviews",       width: 10 },
+  { header: "Maps Link",      key: "gbpUrl",        width: 14 },
+];
+
+// Opens the master xlsx (creating it fresh if absent) and appends newRecords.
+// Existing rows are never modified.
+async function appendToMasterXlsx(newRecords) {
+  if (newRecords.length === 0) return;
+
   const wb = new ExcelJS.Workbook();
-  const sheet = wb.addWorksheet("Leads");
+  let sheet;
+  let existingDataRows = 0;
 
-  // Column definitions with sensible widths
-  sheet.columns = [
-    { header: "Business Name",  key: "businessName",  width: 35 },
-    { header: "Category",       key: "category",       width: 22 },
-    { header: "Town",           key: "town",           width: 18 },
-    { header: "Phone",          key: "phone",          width: 18 },
-    { header: "Email",          key: "email",          width: 32 },
-    { header: "Address",        key: "address",        width: 42 },
-    { header: "Website Status", key: "websiteStatus",  width: 30 },
-    { header: "Rating",         key: "rating",         width: 10 },
-    { header: "Reviews",        key: "reviews",        width: 10 },
-    { header: "Maps Link",      key: "gbpUrl",         width: 14 },
-  ];
+  if (fs.existsSync(MASTER_XLSX_PATH)) {
+    await wb.xlsx.readFile(MASTER_XLSX_PATH);
+    sheet = wb.getWorksheet("Leads");
+  }
 
-  // Style the header row
-  const headerRow = sheet.getRow(1);
-  headerRow.height = 22;
-  headerRow.eachCell((cell) => {
-    cell.font      = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
-    cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F4E79" } };
-    cell.alignment = { vertical: "middle", horizontal: "center" };
-    cell.border    = { bottom: { style: "thin", color: { argb: "FF2E75B6" } } };
-  });
+  if (!sheet) {
+    // Fresh file — set up headers and styling from scratch
+    sheet = wb.addWorksheet("Leads");
+    sheet.columns = SHEET_COLUMNS;
 
-  // Freeze the header row and enable auto-filter
-  sheet.views      = [{ state: "frozen", ySplit: 1, activeCell: "A2" }];
-  sheet.autoFilter = { from: "A1", to: `J1` };
+    const headerRow = sheet.getRow(1);
+    headerRow.height = 22;
+    headerRow.eachCell((cell) => {
+      cell.font      = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
+      cell.fill      = { type: "pattern", pattern: "solid", fgColor: { argb: "FF1F4E79" } };
+      cell.alignment = { vertical: "middle", horizontal: "center" };
+      cell.border    = { bottom: { style: "thin", color: { argb: "FF2E75B6" } } };
+    });
+    sheet.views      = [{ state: "frozen", ySplit: 1, activeCell: "A2" }];
+    sheet.autoFilter = { from: "A1", to: "J1" };
+  } else {
+    // Re-establish column keys from the header row so addRow works by key name
+    sheet.getRow(1).eachCell((cell, colNum) => {
+      const def = SHEET_COLUMNS.find((c) => c.header === cell.value?.toString().trim());
+      if (def) sheet.getColumn(colNum).key = def.key;
+    });
+    existingDataRows = Math.max(0, sheet.rowCount - 1);
+  }
 
-  // Add data rows
-  records.forEach((record, index) => {
-    const rowData = { ...record, gbpUrl: "" }; // gbpUrl replaced by hyperlink below
-    const row = sheet.addRow(rowData);
+  newRecords.forEach((record, index) => {
+    const row = sheet.addRow({ ...record, gbpUrl: "" });
     row.height = 18;
 
-    // Alternating row background
-    if (index % 2 === 1) {
+    // Alternating background continues from the last existing row
+    if ((existingDataRows + index) % 2 === 1) {
       row.eachCell({ includeEmpty: true }, (cell) => {
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF0F4FA" } };
       });
     }
 
-    // Replace Maps Link cell with a clickable hyperlink
     if (record.gbpUrl) {
       const linkCell = row.getCell("gbpUrl");
       linkCell.value = { text: "Open", hyperlink: record.gbpUrl };
       linkCell.font  = { color: { argb: "FF0563C1" }, underline: true };
     }
 
-    // Colour-code Website Status column
-    const statusCell = row.getCell("websiteStatus");
     const status = record.websiteStatus || "";
+    const statusCell = row.getCell("websiteStatus");
     if (status === "None") {
-      statusCell.font = { color: { argb: "FFC00000" }, bold: true }; // red — no presence
+      statusCell.font = { color: { argb: "FFC00000" }, bold: true };
     } else if (status.startsWith("Poor")) {
-      statusCell.font = { color: { argb: "FFED7D31" } };             // orange — poor site
+      statusCell.font = { color: { argb: "FFED7D31" } };
     }
   });
 
   await wb.xlsx.writeFile(MASTER_XLSX_PATH);
+}
+
+// Returns the normalised 07XXXXXXXXX string, or null if not a UK mobile.
+function normalizeUkMobile(phone) {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, "");
+  if (digits.startsWith("447") && digits.length === 12) return "0" + digits.slice(2);
+  if (digits.startsWith("07") && digits.length === 11) return digits;
+  return null;
+}
+
+// Returns true when the business name or GBP category matches an excluded type.
+function isExcludedType(businessName, category) {
+  const haystack = `${businessName || ""} ${category || ""}`.toLowerCase();
+  return EXCLUDED_BUSINESS_TYPES.some((term) => haystack.includes(term.toLowerCase()));
+}
+
+// Returns true when a business has 50 or more Google reviews.
+function tooManyReviews(reviews) {
+  if (!reviews) return false;
+  const n = parseInt(reviews, 10);
+  return !isNaN(n) && n >= 50;
 }
 
 function randomDelay([min, max]) {
@@ -389,7 +422,7 @@ async function extractListingDetails(page) {
 
 async function scrapeSearch(page, category, town) {
   const results = [];
-  const skipCounts = { hasWebsite: 0, noPhone: 0 };
+  const skipCounts = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0, tooManyReviews: 0 };
   const mapsUrl = buildMapsUrl(category, town);
 
   console.log(chalk.green(`\n[START] ${category} in ${town}`));
@@ -440,15 +473,35 @@ async function scrapeSearch(page, category, town) {
         continue;
       }
 
+      const mobilePhone = normalizeUkMobile(details.phone);
+      if (!mobilePhone) {
+        console.log(chalk.yellow(`  [SKIP] ${details.businessName}: not a UK mobile (${details.phone})`));
+        skipCounts.notMobile++;
+        continue;
+      }
+
+      const resolvedCategory = details.gbpCategory || category;
+      if (isExcludedType(details.businessName, resolvedCategory)) {
+        console.log(chalk.yellow(`  [SKIP] ${details.businessName}: excluded business type`));
+        skipCounts.excludedType++;
+        continue;
+      }
+
+      if (tooManyReviews(details.reviews)) {
+        console.log(chalk.yellow(`  [SKIP] ${details.businessName}: ${details.reviews} reviews (≥50)`));
+        skipCounts.tooManyReviews++;
+        continue;
+      }
+
       // Email search is best-effort — lead is saved regardless
       const email = await findEmail(page, details.businessName, town);
       await randomDelay(DELAYS.betweenEmailSearches);
 
       const lead = {
         businessName: details.businessName,
-        category: details.gbpCategory || category,
+        category: resolvedCategory,
         town,
-        phone: details.phone,
+        phone: mobilePhone,
         email: email || "",
         address: details.address || "",
         websiteStatus,
@@ -469,16 +522,15 @@ async function scrapeSearch(page, category, town) {
   }
 
   return { results, skipCounts };
+
 }
 
 async function main() {
   if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
-  // Show current master size upfront
-  if (fs.existsSync(MASTER_XLSX_PATH)) {
-    const existing = await loadMasterXlsx();
-    console.log(chalk.cyan(`[MASTER] ${existing.length} leads already in leads_master.xlsx`));
-  }
+  // Load existing phone numbers upfront — used to skip duplicates after scraping
+  const existingPhones = await loadExistingPhones();
+  console.log(chalk.cyan(`[MASTER] ${existingPhones.size} leads already in leads_master.xlsx`));
 
   const checkpoint = loadCheckpoint();
   if (checkpoint.completed.length > 0) {
@@ -486,7 +538,7 @@ async function main() {
   }
 
   const allResults = [];
-  const totalSkips = { hasWebsite: 0, noPhone: 0 };
+  const totalSkips = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0, tooManyReviews: 0 };
 
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
@@ -509,8 +561,11 @@ async function main() {
           const { results, skipCounts } = await scrapeSearch(page, category, town);
 
           allResults.push(...results);
-          totalSkips.hasWebsite += skipCounts.hasWebsite;
-          totalSkips.noPhone += skipCounts.noPhone;
+          totalSkips.hasWebsite     += skipCounts.hasWebsite;
+          totalSkips.noPhone        += skipCounts.noPhone;
+          totalSkips.notMobile      += skipCounts.notMobile;
+          totalSkips.excludedType   += skipCounts.excludedType;
+          totalSkips.tooManyReviews += skipCounts.tooManyReviews;
 
           checkpoint.completed.push(key);
           checkpoint.results_so_far = allResults.length;
@@ -528,39 +583,43 @@ async function main() {
     await browser.close();
   }
 
-  // Deduplicate new leads from this run
-  const newUnique = deduplicateResults(allResults);
-
-  // Load existing leads — prefer xlsx, fall back to CSV (first-run migration)
-  let existingLeads = await loadMasterXlsx();
-  if (existingLeads === null) {
-    existingLeads = loadMasterCsv(); // migrate from CSV on very first xlsx run
-    if (existingLeads.length > 0) {
-      console.log(chalk.cyan(`[MASTER] Migrated ${existingLeads.length} leads from CSV → xlsx`));
+  // One-time migration: if xlsx doesn't exist yet but a CSV master does, seed from CSV
+  if (!fs.existsSync(MASTER_XLSX_PATH) && fs.existsSync(MASTER_CSV_PATH)) {
+    const csvLeads = loadMasterCsv();
+    if (csvLeads.length > 0) {
+      await appendToMasterXlsx(csvLeads);
+      csvLeads.forEach((r) => { if (r.phone) existingPhones.add(r.phone); });
+      console.log(chalk.cyan(`[MASTER] Migrated ${csvLeads.length} leads from CSV → xlsx`));
     }
   }
 
-  // Merge and deduplicate
-  const merged   = deduplicateResults([...existingLeads, ...newUnique]);
-  const addedCount = merged.length - existingLeads.length;
+  // Deduplicate within this run by name+phone, then filter against existing master by phone
+  const runUnique = deduplicateResults(allResults);
+  const trulyNew  = runUnique.filter((r) => !existingPhones.has(r.phone));
+  const dupCount  = runUnique.length - trulyNew.length;
 
-  // Write master Excel file
-  await writeMasterXlsx(merged);
+  // Append new leads to master — existing rows are untouched
+  await appendToMasterXlsx(trulyNew);
 
-  // Also write a timestamped CSV backup of just this run's new leads
-  if (newUnique.length > 0) {
-    await writeCsv(buildOutputPath(), newUnique);
+  // Timestamped CSV backup of everything found this run (pre-dedup against master)
+  if (runUnique.length > 0) {
+    await writeCsv(buildOutputPath(), runUnique);
   }
 
-  const totalSkipped = totalSkips.hasWebsite + totalSkips.noPhone;
+  const masterTotal = existingPhones.size + trulyNew.length;
+  const totalSkipped = Object.values(totalSkips).reduce((a, b) => a + b, 0);
   console.log("\n" + "=".repeat(50));
-  console.log(chalk.green(`New leads this run:     ${newUnique.length}`));
-  console.log(chalk.green(`New leads added:        ${addedCount} (after dedup with master)`));
-  console.log(chalk.green(`Total in master file:   ${merged.length}`));
-  console.log(chalk.yellow(`Total listings skipped: ${totalSkipped}`));
-  console.log(chalk.yellow(`  Has website:  ${totalSkips.hasWebsite}`));
-  console.log(chalk.yellow(`  No phone:     ${totalSkips.noPhone}`));
-  console.log(chalk.green(`Master file:            ${MASTER_XLSX_PATH}`));
+  console.log(chalk.green(`New leads found this run:       ${runUnique.length}`));
+  console.log(chalk.green(`Already in master (skipped):    ${dupCount}`));
+  console.log(chalk.green(`New leads appended to master:   ${trulyNew.length}`));
+  console.log(chalk.green(`Total leads in master file:     ${masterTotal}`));
+  console.log(chalk.yellow(`Total listings skipped:         ${totalSkipped}`));
+  console.log(chalk.yellow(`  Has website:                  ${totalSkips.hasWebsite}`));
+  console.log(chalk.yellow(`  No phone:                     ${totalSkips.noPhone}`));
+  console.log(chalk.yellow(`  Not UK mobile:                ${totalSkips.notMobile}`));
+  console.log(chalk.yellow(`  Excluded business type:       ${totalSkips.excludedType}`));
+  console.log(chalk.yellow(`  Too many reviews (≥50):       ${totalSkips.tooManyReviews}`));
+  console.log(chalk.green(`Master file:                    ${MASTER_XLSX_PATH}`));
   console.log("=".repeat(50));
 
   deleteCheckpoint();
