@@ -35,11 +35,6 @@ export async function formatSheet() {
 
   const cleanupRequests = [];
 
-  // Delete every banding
-  for (const band of sheetMeta?.bandedRanges || []) {
-    cleanupRequests.push({ deleteBanding: { bandedRangeId: band.bandedRangeId } });
-  }
-
   // Delete every conditional format rule (reverse order so indices stay valid)
   const numRules = sheetMeta?.conditionalFormats?.length || 0;
   for (let i = numRules - 1; i >= 0; i--) {
@@ -108,19 +103,6 @@ export async function formatSheet() {
             fields: "pixelSize",
           },
         })),
-
-        // Alternating row colours — columns A-J only
-        {
-          addBanding: {
-            bandedRange: {
-              range: { sheetId: SHEET_ID, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: NUM_COLS },
-              rowProperties: {
-                firstBandColor:  { red: 1,     green: 1,     blue: 1     },
-                secondBandColor: { red: 0.941, green: 0.957, blue: 0.980 },
-              },
-            },
-          },
-        },
 
         // Conditional: "None" in Website Status (col 6) → red bold
         {
