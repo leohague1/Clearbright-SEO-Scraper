@@ -43,7 +43,7 @@ async function loadExcel() {
     }
     const obj = {};
     row.eachCell((cell, col) => {
-      const val = cell.value?.hyperlink ? "" : (cell.value?.toString() ?? "");
+      const val = cell.value?.hyperlink ? cell.value.hyperlink : (cell.value?.toString() ?? "");
       obj[headers[col]] = val;
     });
     if (obj.businessName) results.push(obj);
