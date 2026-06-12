@@ -285,6 +285,7 @@ async function scrapeSearch(page, category, town, seenListings) {
         category:     resolvedCategory,
         town,
         phone:        mobilePhone,
+        email:        "",
         address:      details.address || "",
         websiteStatus,
         rating:       details.rating  || "",

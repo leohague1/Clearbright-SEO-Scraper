@@ -3,7 +3,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import chalk from "chalk";
-import { clearSheet, initSheet, appendLeads } from "./sheets.js";
+import { initSheet, loadExistingPhones, appendLeads } from "./sheets.js";
 
 const __dirname        = path.dirname(fileURLToPath(import.meta.url));
 const MASTER_XLSX_PATH = path.join(__dirname, "output", "leads_master.xlsx");
@@ -43,8 +43,7 @@ async function loadExcel() {
     }
     const obj = {};
     row.eachCell((cell, col) => {
-      // Hyperlink cells store { text, hyperlink } — extract the URL
-    const val = cell.value?.hyperlink ? cell.value.hyperlink : (cell.value?.toString() ?? "");
+      const val = cell.value?.hyperlink ? "" : (cell.value?.toString() ?? "");
       obj[headers[col]] = val;
     });
     if (obj.businessName) results.push(obj);
@@ -53,26 +52,35 @@ async function loadExcel() {
 }
 
 async function main() {
-  console.log(chalk.cyan("Clearing sheet and re-migrating from Excel..."));
+  console.log(chalk.cyan("Migrating leads from Excel → Google Sheets..."));
 
-  // Clear everything and rebuild fresh so column layout matches current config
-  await clearSheet();
   await initSheet();
+  const existingPhones = await loadExistingPhones();
+  console.log(chalk.cyan(`${existingPhones.size} leads already in Google Sheets`));
 
   const leads = await loadExcel();
   if (!leads.length) {
     console.log(chalk.yellow("No leads found in Excel — nothing to migrate"));
     return;
   }
-  console.log(chalk.cyan(`Found ${leads.length} leads in Excel — migrating...`));
+  console.log(chalk.cyan(`Found ${leads.length} leads in Excel`));
 
-  const BATCH = 100;
-  for (let i = 0; i < leads.length; i += BATCH) {
-    await appendLeads(leads.slice(i, i + BATCH));
-    console.log(chalk.green(`  Migrated ${Math.min(i + BATCH, leads.length)} / ${leads.length}`));
+  const toMigrate = leads.filter((l) => l.phone && !existingPhones.has(l.phone));
+  const alreadyThere = leads.length - toMigrate.length;
+  console.log(chalk.cyan(`${toMigrate.length} to migrate, ${alreadyThere} already in Sheets`));
+
+  if (!toMigrate.length) {
+    console.log(chalk.green("All leads already in Google Sheets — nothing to do"));
+    return;
   }
 
-  console.log(chalk.green(`\nDone! ${leads.length} leads in Google Sheets.`));
+  const BATCH = 100;
+  for (let i = 0; i < toMigrate.length; i += BATCH) {
+    await appendLeads(toMigrate.slice(i, i + BATCH));
+    console.log(chalk.green(`  Migrated ${Math.min(i + BATCH, toMigrate.length)} / ${toMigrate.length}`));
+  }
+
+  console.log(chalk.green(`\nDone! ${toMigrate.length} leads migrated to Google Sheets.`));
 }
 
 main().catch((err) => {
