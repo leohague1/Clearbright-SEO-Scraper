@@ -288,9 +288,8 @@ async function scrapeSearch(page, category, town, seenListings) {
         email:        "",
         address:      details.address || "",
         websiteStatus,
-        rating:       details.rating  || "",
-        reviews:      details.reviews || "",
-        gbpUrl:       mapsPageUrl,
+        rating:  details.rating || "",
+        gbpUrl:  mapsPageUrl,
       });
       seenListings.add(placeUrl);
       console.log(chalk.green(`  [LEAD] ${details.businessName} [${websiteStatus}]`));

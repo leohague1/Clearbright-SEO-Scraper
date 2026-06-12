@@ -7,13 +7,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SPREADSHEET_ID = "1o0YGJTzZwTEYlXN1J3ktQq-JqO2jkaPAL3rRHYNU7bc";
 const SHEET_ID       = 0; // gid=0 = Sheet1
 const SHEET_NAME     = "Sheet1";
-const HEADERS        = [
+const HEADERS    = [
   "Business Name", "Category", "Town", "Phone", "Email",
-  "Address", "Website Status", "Rating", "Reviews", "Maps Link",
+  "Address", "Website Status", "Rating", "Maps Link",
 ];
 
-// Column widths in pixels (matches Excel layout)
-const COL_WIDTHS = [250, 160, 130, 130, 230, 300, 220, 80, 80, 100];
+// Column widths in pixels
+const COL_WIDTHS = [250, 160, 130, 130, 230, 300, 220, 80, 100];
 
 async function getSheets() {
   const auth = new google.auth.GoogleAuth({
@@ -193,11 +193,12 @@ export async function appendLeads(leads) {
   const sheets = await getSheets();
   const rows = leads.map((l) => [
     l.businessName, l.category, l.town, l.phone, l.email,
-    l.address, l.websiteStatus, l.rating, l.reviews, l.gbpUrl,
+    l.address, l.websiteStatus, l.rating,
+    l.gbpUrl ? `=HYPERLINK("${l.gbpUrl}","Open")` : "",
   ]);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A:J`,
+    range: `${SHEET_NAME}!A:I`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: rows },
