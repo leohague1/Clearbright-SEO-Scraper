@@ -65,9 +65,15 @@ async function main() {
   }
   console.log(chalk.cyan(`Found ${leads.length} leads in Excel`));
 
-  const toMigrate = leads.filter((l) => l.phone && !existingPhones.has(l.phone));
+  // Deduplicate within the Excel data itself by phone, then filter against Sheets
+  const seenPhones = new Set(existingPhones);
+  const toMigrate = leads.filter((l) => {
+    if (!l.phone || seenPhones.has(l.phone)) return false;
+    seenPhones.add(l.phone);
+    return true;
+  });
   const alreadyThere = leads.length - toMigrate.length;
-  console.log(chalk.cyan(`${toMigrate.length} to migrate, ${alreadyThere} already in Sheets`));
+  console.log(chalk.cyan(`${toMigrate.length} to migrate, ${alreadyThere} duplicates removed`));
 
   if (!toMigrate.length) {
     console.log(chalk.green("All leads already in Google Sheets — nothing to do"));
