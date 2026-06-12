@@ -35,6 +35,11 @@ export async function formatSheet() {
 
   const cleanupRequests = [];
 
+  // Delete every banding (must be removed before adding new ones, and before clear)
+  for (const band of sheetMeta?.bandedRanges || []) {
+    cleanupRequests.push({ deleteBanding: { bandedRangeId: band.bandedRangeId } });
+  }
+
   // Delete every conditional format rule (reverse order so indices stay valid)
   const numRules = sheetMeta?.conditionalFormats?.length || 0;
   for (let i = numRules - 1; i >= 0; i--) {
@@ -176,12 +181,22 @@ export async function loadExistingPhones() {
   return phones;
 }
 
+// Formats a UK mobile number as 07XXX XXXXXX for easy dialling.
+function formatPhone(phone) {
+  if (!phone) return "";
+  const digits = phone.toString().replace(/\D/g, "");
+  if (digits.startsWith("07") && digits.length === 11) {
+    return `${digits.slice(0, 5)} ${digits.slice(5)}`;
+  }
+  return phone;
+}
+
 // Appends an array of lead objects as new rows.
 export async function appendLeads(leads) {
   if (!leads.length) return;
   const sheets = await getSheets();
   const rows = leads.map((l) => [
-    l.businessName, l.category, l.town, l.phone, l.email,
+    l.businessName, l.category, l.town, formatPhone(l.phone), l.email,
     l.address, l.websiteStatus, l.rating,
     l.gbpUrl ? `=HYPERLINK("${l.gbpUrl}","Open")` : "",
   ]);
