@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "node scraper.js",
-    "migrate": "node migrate.js"
+    "migrate": "node migrate.js",
+    "format-sheet": "node -e \"import('./sheets.js').then(m => m.formatSheet()).then(() => { console.log('Sheet formatted'); process.exit(0); })\""
   },
   "dependencies": {
     "chalk": "^5.3.0",
