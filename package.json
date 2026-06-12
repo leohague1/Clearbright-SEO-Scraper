@@ -3,12 +3,14 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "node scraper.js"
+    "start": "node scraper.js",
+    "migrate": "node migrate.js"
   },
   "dependencies": {
     "chalk": "^5.3.0",
     "csv-writer": "^1.6.0",
     "exceljs": "^4.4.0",
+    "googleapis": "^173.0.0",
     "playwright": "^1.44.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"
