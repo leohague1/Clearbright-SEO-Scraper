@@ -544,8 +544,8 @@ async function main() {
     console.log(chalk.cyan(`[RESUME] Checkpoint found — skipping ${checkpoint.completed.length} completed searches`));
   }
 
-  const allResults = [];
   const totalSkips = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0 };
+  let totalAdded = 0;
 
   const browser = await chromium.launch({ headless: false });
   const context = await browser.newContext({
@@ -567,18 +567,25 @@ async function main() {
         try {
           const { results, skipCounts } = await scrapeSearch(page, category, town, seenListings);
 
-          allResults.push(...results);
           totalSkips.hasWebsite   += skipCounts.hasWebsite;
           totalSkips.noPhone      += skipCounts.noPhone;
           totalSkips.notMobile    += skipCounts.notMobile;
           totalSkips.excludedType += skipCounts.excludedType;
 
+          // Write leads to Excel immediately — nothing is lost if the run is stopped
+          const unique = deduplicateResults(results).filter((r) => !existingPhones.has(r.phone));
+          if (unique.length > 0) {
+            await appendToMasterXlsx(unique);
+            unique.forEach((r) => existingPhones.add(r.phone));
+            totalAdded += unique.length;
+          }
+
           checkpoint.completed.push(key);
-          checkpoint.results_so_far = allResults.length;
+          checkpoint.results_so_far = totalAdded;
           saveCheckpoint(checkpoint);
           saveSeenListings(seenListings);
 
-          console.log(chalk.green(`  [DONE] ${key} — ${results.length} leads found`));
+          console.log(chalk.green(`  [DONE] ${key} — ${results.length} leads found, ${unique.length} added to master`));
         } catch (err) {
           console.log(chalk.red(`[FAIL] Search ${key}: ${err.message}`));
         }
@@ -590,35 +597,10 @@ async function main() {
     await browser.close();
   }
 
-  // One-time migration: if xlsx doesn't exist yet but a CSV master does, seed from CSV
-  if (!fs.existsSync(MASTER_XLSX_PATH) && fs.existsSync(MASTER_CSV_PATH)) {
-    const csvLeads = loadMasterCsv();
-    if (csvLeads.length > 0) {
-      await appendToMasterXlsx(csvLeads);
-      csvLeads.forEach((r) => { if (r.phone) existingPhones.add(r.phone); });
-      console.log(chalk.cyan(`[MASTER] Migrated ${csvLeads.length} leads from CSV → xlsx`));
-    }
-  }
-
-  // Deduplicate within this run by name+phone, then filter against existing master by phone
-  const runUnique = deduplicateResults(allResults);
-  const trulyNew  = runUnique.filter((r) => !existingPhones.has(r.phone));
-  const dupCount  = runUnique.length - trulyNew.length;
-
-  // Append new leads to master — existing rows are untouched
-  await appendToMasterXlsx(trulyNew);
-
-  // Timestamped CSV backup of everything found this run (pre-dedup against master)
-  if (runUnique.length > 0) {
-    await writeCsv(buildOutputPath(), runUnique);
-  }
-
-  const masterTotal = existingPhones.size + trulyNew.length;
+  const masterTotal = existingPhones.size;
   const totalSkipped = Object.values(totalSkips).reduce((a, b) => a + b, 0);
   console.log("\n" + "=".repeat(50));
-  console.log(chalk.green(`New leads found this run:       ${runUnique.length}`));
-  console.log(chalk.green(`Already in master (skipped):    ${dupCount}`));
-  console.log(chalk.green(`New leads appended to master:   ${trulyNew.length}`));
+  console.log(chalk.green(`New leads added this run:       ${totalAdded}`));
   console.log(chalk.green(`Total leads in master file:     ${masterTotal}`));
   console.log(chalk.yellow(`Total listings skipped:         ${totalSkipped}`));
   console.log(chalk.yellow(`  Has website:            ${totalSkips.hasWebsite}`));
