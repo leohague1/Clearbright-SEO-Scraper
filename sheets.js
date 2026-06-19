@@ -4,16 +4,16 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const SPREADSHEET_ID = "1o0YGJTzZwTEYlXN1J3ktQq-JqO2jkaPAL3rRHYNU7bc";
+const SPREADSHEET_ID = "1t8X7bS98yRWQyZPchqwJhiwidML2Lrsp_8cJ5V0XUnw";
 const SHEET_ID       = 0; // gid=0 = Sheet1
 const SHEET_NAME     = "Sheet1";
 const HEADERS    = [
   "Business Name", "Category", "Town", "Phone", "Email",
-  "Address", "Website Status", "Rating", "Maps Link",
+  "Address", "Website Status", "Rating", "Maps Link", "Website URL",
 ];
 
 // Column widths in pixels
-const COL_WIDTHS = [250, 160, 130, 130, 230, 300, 220, 80, 100];
+const COL_WIDTHS = [250, 160, 130, 130, 230, 300, 220, 80, 100, 300];
 
 async function getSheets() {
   const auth = new google.auth.GoogleAuth({
@@ -146,7 +146,7 @@ export async function initSheet() {
   const sheets = await getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A1:J1`,
+    range: `${SHEET_NAME}!A1:K1`,
   });
   if (!res.data.values?.length) {
     await sheets.spreadsheets.values.update({
@@ -199,10 +199,11 @@ export async function appendLeads(leads) {
     l.businessName, l.category, l.town, formatPhone(l.phone), l.email,
     l.address, l.websiteStatus, l.rating,
     l.gbpUrl ? `=HYPERLINK("${l.gbpUrl}","Open")` : "",
+    l.websiteUrl || "",
   ]);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A:I`,
+    range: `${SHEET_NAME}!A:K`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: rows },

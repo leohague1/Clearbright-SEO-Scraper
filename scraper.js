@@ -212,7 +212,7 @@ async function extractListingDetails(page) {
 
 async function scrapeSearch(page, category, town, seenListings) {
   const results    = [];
-  const skipCounts = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0 };
+  const skipCounts = { noWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0 };
 
   console.log(chalk.green(`\n[START] ${category} in ${town}`));
 
@@ -250,9 +250,9 @@ async function scrapeSearch(page, category, town, seenListings) {
       }
 
       const websiteStatus = classifyWebsite(details.websiteUrl);
-      if (websiteStatus === "Good") {
-        console.log(chalk.yellow(`  [SKIP] ${details.businessName}: has website`));
-        skipCounts.hasWebsite++;
+      if (websiteStatus !== "Good") {
+        console.log(chalk.yellow(`  [SKIP] ${details.businessName}: no website or poor website`));
+        skipCounts.noWebsite++;
         seenListings.add(placeUrl); saveSeenListings(seenListings);
         continue;
       }
@@ -288,11 +288,12 @@ async function scrapeSearch(page, category, town, seenListings) {
         email:        "",
         address:      details.address || "",
         websiteStatus,
-        rating:  details.rating || "",
-        gbpUrl:  mapsPageUrl,
+        rating:       details.rating || "",
+        gbpUrl:       mapsPageUrl,
+        websiteUrl:   details.websiteUrl || "",
       });
       seenListings.add(placeUrl); saveSeenListings(seenListings);
-      console.log(chalk.green(`  [LEAD] ${details.businessName} [${websiteStatus}]`));
+      console.log(chalk.green(`  [LEAD] ${details.businessName} — ${details.websiteUrl}`));
 
     } catch (err) {
       // Don't mark as seen on error — retry next run
@@ -319,7 +320,7 @@ async function main() {
     console.log(chalk.cyan(`[RESUME] Checkpoint found — skipping ${checkpoint.completed.length} completed searches`));
   }
 
-  const totalSkips = { hasWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0 };
+  const totalSkips = { noWebsite: 0, noPhone: 0, notMobile: 0, excludedType: 0 };
   let totalAdded   = 0;
 
   const browser = await chromium.launch({ headless: false });
@@ -342,7 +343,7 @@ async function main() {
         try {
           const { results, skipCounts } = await scrapeSearch(page, category, town, seenListings);
 
-          totalSkips.hasWebsite   += skipCounts.hasWebsite;
+          totalSkips.noWebsite    += skipCounts.noWebsite;
           totalSkips.noPhone      += skipCounts.noPhone;
           totalSkips.notMobile    += skipCounts.notMobile;
           totalSkips.excludedType += skipCounts.excludedType;
@@ -377,7 +378,7 @@ async function main() {
   console.log(chalk.green(`New leads added this run:       ${totalAdded}`));
   console.log(chalk.green(`Total leads in Google Sheets:   ${existingPhones.size}`));
   console.log(chalk.yellow(`Total listings skipped:         ${totalSkipped}`));
-  console.log(chalk.yellow(`  Has website:            ${totalSkips.hasWebsite}`));
+  console.log(chalk.yellow(`  No/poor website:        ${totalSkips.noWebsite}`));
   console.log(chalk.yellow(`  No phone:               ${totalSkips.noPhone}`));
   console.log(chalk.yellow(`  Not UK mobile:          ${totalSkips.notMobile}`));
   console.log(chalk.yellow(`  Excluded business type: ${totalSkips.excludedType}`));

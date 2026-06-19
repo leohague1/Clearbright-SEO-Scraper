@@ -28,21 +28,14 @@ const ESSEX_TOWNS = [
   "Mersea Island", "Wivenhoe",
 ];
 
-// Note: hair salon / barber categories are intentionally excluded — they are
-// covered by EXCLUDED_BUSINESS_TYPES and would produce zero leads.
 export const SEARCHES = [
-  { category: "plumber",           towns: ESSEX_TOWNS },
-  { category: "electrician",       towns: ESSEX_TOWNS },
-  { category: "cleaning service",  towns: ESSEX_TOWNS },
-  { category: "painter decorator", towns: ESSEX_TOWNS },
-  { category: "gardener",          towns: ESSEX_TOWNS },
-  { category: "handyman",          towns: ESSEX_TOWNS },
-  { category: "plasterer",         towns: ESSEX_TOWNS },
-  { category: "tiler",             towns: ESSEX_TOWNS },
-  { category: "roofer",            towns: ESSEX_TOWNS },
-  { category: "carpenter",         towns: ESSEX_TOWNS },
-  { category: "locksmith",         towns: ESSEX_TOWNS },
-  { category: "mobile mechanic",   towns: ESSEX_TOWNS },
+  { category: "accountant", towns: ["Chelmsford", "Colchester", "Southend-on-Sea", "Basildon", "Braintree", "Harlow", "Brentwood", "Grays", "Thurrock", "Wickford", "Rayleigh", "Billericay", "Witham", "Clacton-on-Sea", "Maldon", "Saffron Walden", "Halstead", "Loughton", "Epping", "Waltham Abbey", "Romford", "Ilford", "Hornchurch", "Upminster", "Leigh-on-Sea", "Westcliff-on-Sea", "Canvey Island"] },
+  { category: "bookkeeper", towns: ["Chelmsford", "Colchester", "Southend-on-Sea", "Basildon", "Braintree", "Harlow", "Brentwood", "Grays", "Thurrock", "Wickford", "Rayleigh", "Billericay", "Witham", "Clacton-on-Sea", "Maldon", "Saffron Walden", "Halstead", "Loughton", "Epping", "Waltham Abbey", "Romford", "Ilford", "Hornchurch", "Upminster", "Leigh-on-Sea", "Westcliff-on-Sea", "Canvey Island"] },
+  { category: "solicitor", towns: ["Chelmsford", "Colchester", "Southend-on-Sea", "Basildon", "Braintree", "Harlow", "Brentwood", "Grays", "Thurrock", "Wickford", "Rayleigh", "Billericay", "Witham", "Clacton-on-Sea", "Maldon", "Saffron Walden", "Halstead", "Loughton", "Epping", "Waltham Abbey", "Romford", "Ilford", "Hornchurch", "Upminster", "Leigh-on-Sea", "Westcliff-on-Sea", "Canvey Island"] },
+  { category: "dentist", towns: ["Chelmsford", "Colchester", "Southend-on-Sea", "Basildon", "Braintree", "Harlow", "Brentwood", "Grays", "Thurrock", "Wickford", "Rayleigh", "Billericay", "Witham", "Clacton-on-Sea", "Maldon", "Saffron Walden", "Halstead", "Loughton", "Epping", "Waltham Abbey", "Romford", "Ilford", "Hornchurch", "Upminster", "Leigh-on-Sea", "Westcliff-on-Sea", "Canvey Island"] },
+  { category: "estate agent", towns: ["Chelmsford", "Colchester", "Southend-on-Sea", "Basildon", "Braintree", "Harlow", "Brentwood", "Grays", "Thurrock", "Wickford", "Rayleigh", "Billericay", "Witham", "Clacton-on-Sea", "Maldon", "Saffron Walden", "Halstead", "Loughton", "Epping", "Waltham Abbey", "Romford", "Ilford", "Hornchurch", "Upminster", "Leigh-on-Sea", "Westcliff-on-Sea", "Canvey Island"] },
+  { category: "gym", towns: ["Chelmsford", "Colchester", "Southend-on-Sea", "Basildon", "Braintree", "Harlow", "Brentwood", "Grays", "Thurrock", "Wickford", "Rayleigh", "Billericay", "Witham", "Clacton-on-Sea", "Maldon", "Saffron Walden", "Halstead", "Loughton", "Epping", "Waltham Abbey", "Romford", "Ilford", "Hornchurch", "Upminster", "Leigh-on-Sea", "Westcliff-on-Sea", "Canvey Island"] },
+  { category: "physiotherapist", towns: ["Chelmsford", "Colchester", "Southend-on-Sea", "Basildon", "Braintree", "Harlow", "Brentwood", "Grays", "Thurrock", "Wickford", "Rayleigh", "Billericay", "Witham", "Clacton-on-Sea", "Maldon", "Saffron Walden", "Halstead", "Loughton", "Epping", "Waltham Abbey", "Romford", "Ilford", "Hornchurch", "Upminster", "Leigh-on-Sea", "Westcliff-on-Sea", "Canvey Island"] },
 ];
 
 export const MAX_RESULTS_PER_SEARCH = 20;
