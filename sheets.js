@@ -9,11 +9,11 @@ const SHEET_ID       = 0; // gid=0 = Sheet1
 const SHEET_NAME     = "Sheet1";
 const HEADERS    = [
   "Business Name", "Category", "Town", "Phone", "Email",
-  "Address", "Website Status", "Rating", "Maps Link", "Website URL",
+  "Address", "Rating", "Maps Link", "Website URL",
 ];
 
 // Column widths in pixels
-const COL_WIDTHS = [250, 160, 130, 130, 230, 300, 220, 80, 100, 300];
+const COL_WIDTHS = [250, 160, 130, 130, 230, 300, 80, 100, 300];
 
 async function getSheets() {
   const auth = new google.auth.GoogleAuth({
@@ -109,33 +109,6 @@ export async function formatSheet() {
           },
         })),
 
-        // Conditional: "None" in Website Status (col 6) → red bold
-        {
-          addConditionalFormatRule: {
-            rule: {
-              ranges: [{ sheetId: SHEET_ID, startRowIndex: 1, startColumnIndex: 6, endColumnIndex: 7 }],
-              booleanRule: {
-                condition: { type: "TEXT_EQ", values: [{ userEnteredValue: "None" }] },
-                format: { textFormat: { bold: true, foregroundColor: { red: 0.753, green: 0, blue: 0 } } },
-              },
-            },
-            index: 0,
-          },
-        },
-
-        // Conditional: "Poor" in Website Status → orange
-        {
-          addConditionalFormatRule: {
-            rule: {
-              ranges: [{ sheetId: SHEET_ID, startRowIndex: 1, startColumnIndex: 6, endColumnIndex: 7 }],
-              booleanRule: {
-                condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Poor" }] },
-                format: { textFormat: { foregroundColor: { red: 0.929, green: 0.490, blue: 0.192 } } },
-              },
-            },
-            index: 1,
-          },
-        },
       ],
     },
   });
@@ -146,7 +119,7 @@ export async function initSheet() {
   const sheets = await getSheets();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A1:K1`,
+    range: `${SHEET_NAME}!A1:I1`,
   });
   if (!res.data.values?.length) {
     await sheets.spreadsheets.values.update({
@@ -197,13 +170,13 @@ export async function appendLeads(leads) {
   const sheets = await getSheets();
   const rows = leads.map((l) => [
     l.businessName, l.category, l.town, formatPhone(l.phone), l.email,
-    l.address, l.websiteStatus, l.rating,
+    l.address, l.rating,
     l.gbpUrl ? `=HYPERLINK("${l.gbpUrl}","Open")` : "",
     l.websiteUrl || "",
   ]);
   await sheets.spreadsheets.values.append({
     spreadsheetId: SPREADSHEET_ID,
-    range: `${SHEET_NAME}!A:K`,
+    range: `${SHEET_NAME}!A:I`,
     valueInputOption: "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: rows },
